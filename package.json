@@ -1,0 +1,42 @@
+{
+  "name": "e2e-socket-server",
+  "version": "1.0.0",
+  "description": "端到端加密的 WebSocket 服务器，支持房间管理和权限控制",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node scripts/test-connection.js",
+    "test:client": "node examples/client.js",
+    "test:multi": "node examples/multi-client-test.js",
+    "test:encrypted": "node examples/encrypted-communication.js",
+    "test:port": "node scripts/test-port-switching.js",
+    "test:config": "node examples/config-test.js",
+    "setup": "chmod +x scripts/setup.sh && ./scripts/setup.sh",
+    "deploy": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh production",
+    "deploy:dev": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh development",
+    "pm2:start": "pm2 start ecosystem.config.js --env production",
+    "pm2:stop": "pm2 stop e2e-socket",
+    "pm2:restart": "pm2 restart e2e-socket",
+    "pm2:logs": "pm2 logs e2e-socket",
+    "pm2:status": "pm2 status"
+  },
+  "keywords": [
+    "websocket",
+    "e2e",
+    "encryption",
+    "signal",
+    "real-time"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "uuid": "^9.0.1",
+    "cors": "^2.8.5",
+    "node-fetch": "^3.3.2",
+    "qrcode": "^1.5.3"
+  }
+}

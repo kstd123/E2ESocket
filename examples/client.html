@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E2E WebSocket Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 主容器 - 微信风格布局 */
+        .wechat-container {
+            display: flex;
+            height: 100vh;
+            background: white;
+        }
+
+        /* 左侧边栏 */
+        .sidebar {
+            width: 260px;
+            background: #2e2e2e;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: #2e2e2e;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #3e3e3e;
+        }
+
+        .sidebar-header h1 {
+            font-size: 16px;
+            font-weight: normal;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-dot.connected {
+            background: #07C160;
+        }
+
+        /* 连接设置 */
+        .connection-panel {
+            padding: 15px;
+            background: #3e3e3e;
+            border-bottom: 1px solid #4e4e4e;
+        }
+
+        .connection-panel input {
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #2e2e2e;
+            color: white;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .connection-panel input::placeholder {
+            color: #888;
+        }
+
+        .connection-panel button {
+            width: 48%;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            background: #07C160;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .connection-panel button:hover {
+            opacity: 0.8;
+        }
+
+        .connection-panel button:last-child {
+            background: #555;
+            margin-left: 4%;
+        }
+
+        /* 房间列表 */
+        .room-list {
+            flex: 1;
+            overflow-y: auto;
+            background: #2e2e2e;
+        }
+
+        .room-item {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #3e3e3e;
+            transition: background 0.2s;
+            color: white;
+        }
+
+        .room-item:hover {
+            background: #3e3e3e;
+        }
+
+        .room-item.active {
+            background: #3e3e3e;
+        }
+
+        .room-item-title {
+            font-size: 14px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .room-item-info {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .room-badge {
+            background: #07C160;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        /* 主聊天区域 */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+        }
+
+        /* 聊天头部 */
+        .chat-header {
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .chat-info {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .chat-actions button {
+            padding: 6px 15px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 4px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .chat-actions button:hover {
+            background: #f5f5f5;
+        }
+
+        /* 消息区域 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        /* 消息气泡 */
+        .message-wrapper {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message-wrapper.mine {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background: #07C160;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .message-wrapper.mine .message-avatar {
+            background: #95EC69;
+        }
+
+        .message-content-wrapper {
+            max-width: 60%;
+            margin: 0 10px;
+        }
+
+        .message-info {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .message-wrapper.mine .message-info {
+            text-align: right;
+        }
+
+        .message-bubble {
+            padding: 10px 15px;
+            border-radius: 4px;
+            word-wrap: break-word;
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        /* 别人的消息 - 白色气泡 */
+        .message-bubble.other {
+            background: white;
+            color: #333;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-bubble.other::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 12px;
+            width: 0;
+            height: 0;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-right: 8px solid white;
+        }
+
+        /* 自己的消息 - 绿色气泡 */
+        .message-bubble.mine {
+            background: #95EC69;
+            color: #333;
+        }
+
+        .message-wrapper.mine .message-bubble {
+            text-align: left;
+        }
+
+        .message-bubble.mine::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 12px;
+            width: 0;
+            height: 0;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-left: 8px solid #95EC69;
+        }
+
+        /* 系统消息 */
+        .system-message {
+            text-align: center;
+            margin: 15px 0;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .system-message span {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 4px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* 输入区域 */
+        .input-area {
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            padding: 15px 20px;
+        }
+
+        .input-toolbar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            font-size: 20px;
+            color: #666;
+        }
+
+        .input-toolbar span {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .input-toolbar span:hover {
+            color: #07C160;
+        }
+
+        .input-box {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-box input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .input-box input:focus {
+            border-color: #07C160;
+        }
+
+        .send-button {
+            padding: 10px 30px;
+            background: #07C160;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+
+        .send-button:hover {
+            opacity: 0.8;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 房间加入面板 */
+        .join-room-panel {
+            padding: 15px;
+            background: #3e3e3e;
+            border-bottom: 1px solid #4e4e4e;
+        }
+
+        .join-room-panel input,
+        .join-room-panel select {
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #2e2e2e;
+            color: white;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .join-room-panel button {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            background: #07C160;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .join-room-panel button:hover {
+            opacity: 0.8;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* 配置编辑器 */
+        .config-editor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .config-editor.show {
+            display: flex;
+        }
+
+        .config-editor-content {
+            background: white;
+            border-radius: 8px;
+            width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-editor-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .config-editor-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .config-editor-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .config-editor-body textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .config-editor-footer {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .config-version {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 二维码显示 */
+        .qrcode-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .qrcode-modal.show {
+            display: flex;
+        }
+
+        .qrcode-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .qrcode-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .qrcode-content img {
+            max-width: 300px;
+            margin: 20px 0;
+        }
+
+        .qrcode-content .room-info {
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+        }
+
+        .admin-badge {
+            background: #ff9800;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 微信风格主容器 -->
+    <div class="wechat-container">
+        <!-- 左侧边栏 -->
+        <div class="sidebar">
+            <!-- 侧边栏头部 -->
+            <div class="sidebar-header">
+                <h1>
+                    <span class="status-dot" id="statusDot"></span>
+                    E2E Chat
+                </h1>
+            </div>
+
+            <!-- 连接设置 -->
+            <div class="connection-panel">
+                <input type="text" id="serverUrl" placeholder="服务器地址">
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="connect()">连接</button>
+                    <button onclick="disconnect()">断开</button>
+                </div>
+            </div>
+
+            <!-- 加入房间 -->
+            <div class="join-room-panel">
+                <input type="text" id="roomIdInput" placeholder="房间号（留空自动生成）">
+                <select id="permissionSelect">
+                    <option value="read_write">可读可写</option>
+                    <option value="read_only">只读</option>
+                </select>
+                <button onclick="joinRoom()">加入房间</button>
+            </div>
+
+            <!-- 房间列表 -->
+            <div class="room-list" id="roomList">
+                <div class="room-item active" id="currentRoomItem" style="display: none;">
+                    <div class="room-item-title">
+                        <span id="roomName">当前房间</span>
+                        <span class="room-badge" id="memberCountBadge">0人</span>
+                    </div>
+                    <div class="room-item-info" id="roomPermission">权限: -</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主聊天区域 -->
+        <div class="chat-main">
+            <!-- 聊天头部 -->
+            <div class="chat-header">
+                <div>
+                    <div class="chat-title" id="chatTitle">E2E WebSocket Chat</div>
+                    <div class="chat-info" id="chatInfo">请连接服务器并加入房间开始聊天</div>
+                </div>
+                <div class="chat-actions">
+                    <button onclick="showQRCode()" id="qrcodeBtn" style="display:none;">📱 二维码</button>
+                    <button onclick="openConfigEditor()" id="configBtn" style="display:none;">⚙️ 配置</button>
+                    <button onclick="getRoomInfo()">房间信息</button>
+                    <button onclick="leaveRoom()">离开房间</button>
+                </div>
+            </div>
+
+            <!-- 消息区域 -->
+            <div class="messages-container" id="messagesContainer">
+                <div class="system-message">
+                    <span>欢迎使用 E2E WebSocket Chat</span>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-area">
+                <div class="input-toolbar">
+                    <span title="表情">😀</span>
+                    <span title="文件">📁</span>
+                    <span title="图片">🖼️</span>
+                </div>
+                <div class="input-box">
+                    <input type="text" id="messageInput" placeholder="输入消息..." onkeypress="handleKeyPress(event)">
+                    <button class="send-button" onclick="sendMessage()" id="sendButton" disabled>发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置编辑器模态框 -->
+    <div class="config-editor" id="configEditor" onclick="closeConfigEditor(event)">
+        <div class="config-editor-content" onclick="event.stopPropagation()">
+            <div class="config-editor-header">
+                <h2>📝 房间配置编辑器</h2>
+                <button class="close-btn" onclick="closeConfigEditor()">×</button>
+            </div>
+            <div class="config-editor-body">
+                <textarea id="configTextarea"
+                    placeholder='输入JSON配置，例如：&#10;{&#10;  "title": "我的配置",&#10;  "settings": {&#10;    "value": 123&#10;  }&#10;}'></textarea>
+            </div>
+            <div class="config-editor-footer">
+                <div class="config-version">版本: <span id="configVersion">0</span></div>
+                <div class="btn-group">
+                    <button onclick="closeConfigEditor()">取消</button>
+                    <button onclick="publishConfig()" class="send-button">发布配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 二维码模态框 -->
+    <div class="qrcode-modal" id="qrcodeModal" onclick="closeQRCode(event)">
+        <div class="qrcode-content" onclick="event.stopPropagation()">
+            <h2>📱 扫码加入房间</h2>
+            <div class="room-info">房间号: <strong id="qrRoomId"></strong></div>
+            <img id="qrcodeImage" src="" alt="二维码">
+            <button onclick="closeQRCode()" class="send-button">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentRoomId = null;
+        let currentPermission = null;
+        let isAdmin = false;
+        let myClientId = null;
+        let currentConfig = null;
+        let configVersion = 0;
+
+        // 连接服务器
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    updateStatus('connected');
+                    addSystemMessage('已连接到服务器');
+                };
+
+                ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    handleMessage(message);
+                };
+
+                ws.onerror = (error) => {
+                    addSystemMessage('连接错误');
+                };
+
+                ws.onclose = () => {
+                    updateStatus('disconnected');
+                    addSystemMessage('已断开连接');
+                };
+            } catch (error) {
+                addSystemMessage('连接失败: ' + error.message);
+            }
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        // 加入房间
+        function joinRoom() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接服务器');
+                return;
+            }
+
+            const roomId = document.getElementById('roomIdInput').value;
+            const permission = document.getElementById('permissionSelect').value;
+
+            ws.send(JSON.stringify({
+                type: 'join_room',
+                data: {
+                    roomId: roomId || undefined,
+                    permission: permission,
+                    isCreate: !roomId
+                }
+            }));
+        }
+
+        // 离开房间
+        function leaveRoom() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接服务器');
+                return;
+            }
+
+            if (!currentRoomId) {
+                addSystemMessage('当前未在任何房间');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'leave_room',
+                data: {}
+            }));
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接服务器');
+                return;
+            }
+
+            if (!currentRoomId) {
+                addSystemMessage('请先加入房间');
+                return;
+            }
+
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+
+            if (!content) {
+                return;
+            }
+
+            // 先显示自己的消息
+            addChatMessage(content, true, '我');
+
+            // 发送到服务器
+            ws.send(JSON.stringify({
+                type: 'send_message',
+                data: {
+                    content: content,
+                    encrypted: false
+                }
+            }));
+
+            input.value = '';
+        }
+
+        // 获取房间信息
+        function getRoomInfo() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addSystemMessage('请先连接服务器');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'get_room_info',
+                data: {}
+            }));
+        }
+
+        // 处理消息
+        function handleMessage(message) {
+            console.log('Received:', message);
+
+            switch (message.type) {
+                case 'join':
+                    if (message.data.clientId) {
+                        myClientId = message.data.clientId;
+                    }
+
+                    if (message.data.success) {
+                        currentRoomId = message.data.roomId;
+                        currentPermission = message.data.permission;
+                        isAdmin = message.data.isAdmin;
+                        updateRoomInfo(message.data.memberCount);
+                        addSystemMessage(`已加入房间: ${currentRoomId}`);
+                        document.getElementById('sendButton').disabled = false;
+                    }
+                    break;
+
+                case 'leave':
+                    if (message.data.success) {
+                        addSystemMessage(`已离开房间: ${message.data.roomId}`);
+                        currentRoomId = null;
+                        currentPermission = null;
+                        isAdmin = false;
+                        updateRoomInfo(0);
+                        document.getElementById('sendButton').disabled = true;
+                    }
+                    break;
+
+                case 'message':
+                    if (message.data.from && message.data.from !== myClientId) {
+                        const sender = message.data.from.substring(0, 8);
+                        addChatMessage(message.data.content, false, sender);
+                    }
+                    break;
+
+                case 'broadcast':
+                    handleBroadcast(message.data);
+                    break;
+
+                case 'room_info':
+                    displayRoomInfo(message.data);
+                    break;
+
+                case 'error':
+                    addSystemMessage('错误: ' + message.data.error);
+                    break;
+
+                case 'config_update':
+                    handleConfigUpdate(message.data);
+                    break;
+
+                case 'publish_config':
+                    if (message.data.success) {
+                        addSystemMessage(`配置已发布，版本: ${message.data.version}`);
+                        closeConfigEditor();
+                    }
+                    break;
+            }
+        }
+
+        // 处理广播消息
+        function handleBroadcast(data) {
+            switch (data.event) {
+                case 'member_joined':
+                    addSystemMessage(`新成员加入，当前人数: ${data.memberCount}`);
+                    updateMemberCount(data.memberCount);
+                    break;
+
+                case 'member_left':
+                    addSystemMessage(`成员离开，当前人数: ${data.memberCount}`);
+                    updateMemberCount(data.memberCount);
+                    break;
+
+                case 'member_kicked':
+                    addSystemMessage(`成员被踢出房间`);
+                    break;
+
+                case 'permission_updated':
+                    addSystemMessage(`权限已更新`);
+                    break;
+
+                case 'config_published':
+                    handleConfigUpdate({ config: data.config, version: data.version });
+                    addSystemMessage(`配置已更新，版本: ${data.version}`);
+                    break;
+            }
+        }
+
+        // 显示房间信息
+        function displayRoomInfo(info) {
+            let infoText = `房间ID: ${info.id}\n在线人数: ${info.memberCount}/${info.maxMembers}\n\n成员列表:\n`;
+            info.members.forEach((member, index) => {
+                infoText += `${index + 1}. ${member.id.substring(0, 8)}... (${member.permission})\n`;
+            });
+            addSystemMessage(infoText);
+        }
+
+        // 更新房间信息
+        function updateRoomInfo(memberCount) {
+            const roomItem = document.getElementById('currentRoomItem');
+            const chatTitle = document.getElementById('chatTitle');
+            const chatInfo = document.getElementById('chatInfo');
+            const configBtn = document.getElementById('configBtn');
+            const qrcodeBtn = document.getElementById('qrcodeBtn');
+
+            if (currentRoomId) {
+                roomItem.style.display = 'block';
+                document.getElementById('roomName').textContent = currentRoomId;
+                document.getElementById('memberCountBadge').textContent = `${memberCount}人`;
+                document.getElementById('roomPermission').textContent = `权限: ${currentPermission}`;
+
+                let titleText = `房间: ${currentRoomId}`;
+                if (isAdmin) {
+                    titleText += ' (管理员)';
+                }
+                chatTitle.textContent = titleText;
+                chatInfo.textContent = `${memberCount} 人在线 · ${currentPermission}`;
+
+                // 显示管理员按钮
+                if (isAdmin) {
+                    configBtn.style.display = 'inline-block';
+                    qrcodeBtn.style.display = 'inline-block';
+                } else {
+                    configBtn.style.display = 'none';
+                    qrcodeBtn.style.display = 'none';
+                }
+            } else {
+                roomItem.style.display = 'none';
+                chatTitle.textContent = 'E2E WebSocket Chat';
+                chatInfo.textContent = '请连接服务器并加入房间开始聊天';
+                configBtn.style.display = 'none';
+                qrcodeBtn.style.display = 'none';
+            }
+        }
+
+        // 更新成员数量
+        function updateMemberCount(count) {
+            document.getElementById('memberCountBadge').textContent = `${count}人`;
+            document.getElementById('chatInfo').textContent = `${count} 人在线 · ${currentPermission}`;
+        }
+
+        // 更新连接状态
+        function updateStatus(status) {
+            const statusDot = document.getElementById('statusDot');
+            if (status === 'connected') {
+                statusDot.classList.add('connected');
+            } else {
+                statusDot.classList.remove('connected');
+            }
+        }
+
+        // 添加聊天消息（气泡样式）
+        function addChatMessage(content, isMine, sender) {
+            const container = document.getElementById('messagesContainer');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper' + (isMine ? ' mine' : '');
+
+            // 头像
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender ? sender.substring(0, 2).toUpperCase() : '我';
+
+            // 内容包装
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'message-content-wrapper';
+
+            // 信息（发送者和时间）
+            const info = document.createElement('div');
+            info.className = 'message-info';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            info.textContent = isMine ? time : `${sender} ${time}`;
+
+            // 气泡
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble ' + (isMine ? 'mine' : 'other');
+            bubble.textContent = content;
+
+            contentWrapper.appendChild(info);
+            contentWrapper.appendChild(bubble);
+
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(contentWrapper);
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 添加系统消息
+        function addSystemMessage(text) {
+            const container = document.getElementById('messagesContainer');
+            const message = document.createElement('div');
+            message.className = 'system-message';
+            message.innerHTML = `<span>${text}</span>`;
+            container.appendChild(message);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 键盘事件处理
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // 配置管理功能
+        function handleConfigUpdate(data) {
+            currentConfig = data.config;
+            configVersion = data.version;
+
+            if (currentConfig) {
+                addSystemMessage(`收到配置更新，版本: ${configVersion}`);
+
+                // 如果配置编辑器打开，更新内容
+                const textarea = document.getElementById('configTextarea');
+                if (textarea && document.getElementById('configEditor').classList.contains('show')) {
+                    textarea.value = JSON.stringify(currentConfig, null, 2);
+                    document.getElementById('configVersion').textContent = configVersion;
+                }
+            }
+        }
+
+        function openConfigEditor() {
+            if (!isAdmin) {
+                addSystemMessage('只有管理员可以编辑配置');
+                return;
+            }
+
+            const editor = document.getElementById('configEditor');
+            const textarea = document.getElementById('configTextarea');
+
+            // 加载当前配置
+            if (currentConfig) {
+                textarea.value = JSON.stringify(currentConfig, null, 2);
+            } else {
+                textarea.value = '{\n  "title": "示例配置",\n  "settings": {}\n}';
+            }
+
+            document.getElementById('configVersion').textContent = configVersion;
+            editor.classList.add('show');
+        }
+
+        function closeConfigEditor(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('configEditor').classList.remove('show');
+        }
+
+        function publishConfig() {
+            const textarea = document.getElementById('configTextarea');
+            const configText = textarea.value.trim();
+
+            if (!configText) {
+                addSystemMessage('配置内容不能为空');
+                return;
+            }
+
+            try {
+                // 验证JSON格式
+                const configData = JSON.parse(configText);
+
+                // 发送配置
+                ws.send(JSON.stringify({
+                    type: 'publish_config',
+                    data: {
+                        config: configData
+                    }
+                }));
+
+                addSystemMessage('正在发布配置...');
+            } catch (error) {
+                addSystemMessage('JSON格式错误: ' + error.message);
+            }
+        }
+
+        // 获取API URL（自动检测环境）
+        function getApiUrl() {
+            // 如果是从服务器加载的（通过HTTP），使用当前域名和端口
+            if (window.location.protocol.startsWith('http')) {
+                return `${window.location.protocol}//${window.location.host}`;
+            }
+            // 如果是本地文件（file://），使用默认配置
+            return 'http://localhost:3001';
+        }
+
+        // 二维码功能
+        function showQRCode() {
+            if (!currentRoomId) {
+                addSystemMessage('请先加入房间');
+                return;
+            }
+
+            const modal = document.getElementById('qrcodeModal');
+            const img = document.getElementById('qrcodeImage');
+            const roomIdEl = document.getElementById('qrRoomId');
+
+            // 获取当前URL的协议和主机
+            const apiUrl = getApiUrl();
+            const qrcodeUrl = `${apiUrl}/api/rooms/${currentRoomId}/qrcode?format=data`;
+
+            roomIdEl.textContent = currentRoomId;
+
+            // 获取二维码
+            fetch(qrcodeUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        img.src = data.data.dataUrl;
+                        modal.classList.add('show');
+                    } else {
+                        addSystemMessage('生成二维码失败');
+                    }
+                })
+                .catch(error => {
+                    addSystemMessage('获取二维码失败: ' + error.message);
+                });
+        }
+
+        function closeQRCode(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('qrcodeModal').classList.remove('show');
+        }
+
+        // 从URL参数自动加入房间
+        function checkAutoJoin() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+
+            if (roomId) {
+                addSystemMessage(`检测到房间号: ${roomId}，准备自动加入...`);
+                document.getElementById('roomIdInput').value = roomId;
+
+                // 等待连接后自动加入
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        joinRoom();
+                    }
+                }, 1000);
+            }
+        }
+
+        // 获取WebSocket URL（自动检测环境）
+        function getWebSocketUrl() {
+            // 如果是从服务器加载的（通过HTTP），使用当前域名
+            if (window.location.protocol.startsWith('http')) {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.hostname;
+                const port = 8080; // WebSocket 端口
+                return `${wsProtocol}//${host}:${port}`;
+            }
+            // 如果是本地文件（file://），使用默认配置
+            return 'ws://localhost:8080';
+        }
+
+        // 页面加载完成
+        window.onload = () => {
+            // 自动填充WebSocket地址
+            document.getElementById('serverUrl').value = getWebSocketUrl();
+
+            addSystemMessage('欢迎使用 E2E WebSocket Chat');
+            checkAutoJoin();
+        };
+    </script>
+</body>
+
+</html>
