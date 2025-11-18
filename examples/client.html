@@ -28,7 +28,7 @@
 
         /* 左侧边栏 */
         .sidebar {
-            width: 260px;
+            width: 320px;
             background: #2e2e2e;
             display: flex;
             flex-direction: column;
@@ -566,6 +566,146 @@
             border-radius: 10px;
             margin-left: 5px;
         }
+
+        /* 房间列表区域 */
+        .rooms-section {
+            background: #3e3e3e;
+            border-bottom: 1px solid #4e4e4e;
+        }
+
+        .rooms-section-header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .rooms-section-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            color: #07C160;
+            background: rgba(7, 193, 96, 0.1);
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .available-rooms {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .available-room-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #4e4e4e;
+            transition: background 0.2s;
+            color: #ccc;
+        }
+
+        .available-room-item:hover {
+            background: #4e4e4e;
+        }
+
+        .available-room-item:last-child {
+            border-bottom: none;
+        }
+
+        .available-room-item.active {
+            background: #07C160;
+            color: white;
+        }
+
+        .room-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .room-item-id {
+            font-size: 14px;
+            font-weight: 500;
+            color: #07C160;
+        }
+
+        .available-room-item.active .room-item-id {
+            color: white;
+        }
+
+        .room-item-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .available-room-item.active .room-item-stats {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .room-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .room-stat-icon {
+            font-size: 10px;
+        }
+
+        .no-rooms {
+            padding: 20px;
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .join-room-btn {
+            background: #07C160;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .join-room-btn:hover {
+            opacity: 0.8;
+        }
+
+        .join-room-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -588,6 +728,27 @@
                 <div style="display: flex; gap: 10px;">
                     <button onclick="connect()">连接</button>
                     <button onclick="disconnect()">断开</button>
+                </div>
+            </div>
+
+            <!-- 可用房间列表 -->
+            <div class="rooms-section" id="roomsSection" style="display: none;">
+                <div class="rooms-section-header">
+                    <h3>
+                        <span>🏠</span>
+                        可用房间
+                    </h3>
+                    <button class="refresh-btn" onclick="refreshRoomList()" title="刷新房间列表">
+                        🔄
+                    </button>
+                </div>
+                <div class="available-rooms" id="availableRooms">
+                    <div class="no-rooms">
+                        <div>暂无可用房间</div>
+                        <div style="font-size: 12px; margin-top: 5px; color: #666;">
+                            请先连接服务器
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -701,6 +862,8 @@
                 ws.onopen = () => {
                     updateStatus('connected');
                     addSystemMessage('已连接到服务器');
+                    showRoomListSection();
+                    refreshRoomList();
                 };
 
                 ws.onmessage = (event) => {
@@ -715,6 +878,7 @@
                 ws.onclose = () => {
                     updateStatus('disconnected');
                     addSystemMessage('已断开连接');
+                    hideRoomListSection();
                 };
             } catch (error) {
                 addSystemMessage('连接失败: ' + error.message);
@@ -814,6 +978,132 @@
             }));
         }
 
+        // 刷新房间列表
+        function refreshRoomList() {
+            const refreshBtn = document.querySelector('.refresh-btn');
+            refreshBtn.classList.add('spinning');
+
+            fetchRoomList().finally(() => {
+                setTimeout(() => {
+                    refreshBtn.classList.remove('spinning');
+                }, 500);
+            });
+        }
+
+        // 获取房间列表
+        async function fetchRoomList() {
+            try {
+                const apiUrl = getApiUrl();
+                const response = await fetch(`${apiUrl}/api/rooms`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayRoomList(data.data);
+                } else {
+                    throw new Error(data.error || '获取房间列表失败');
+                }
+            } catch (error) {
+                console.error('获取房间列表失败:', error);
+                showNoRooms('获取房间列表失败，请稍后重试');
+            }
+        }
+
+        // 显示房间列表
+        function displayRoomList(rooms) {
+            const container = document.getElementById('availableRooms');
+
+            if (!rooms || rooms.length === 0) {
+                showNoRooms('暂无可用房间');
+                return;
+            }
+
+            const roomItems = rooms.map(room => createRoomItem(room)).join('');
+            container.innerHTML = roomItems;
+
+            // 标记当前房间
+            if (currentRoomId) {
+                const currentRoomItem = container.querySelector(`[data-room-id="${currentRoomId}"]`);
+                if (currentRoomItem) {
+                    currentRoomItem.classList.add('active');
+                }
+            }
+        }
+
+        // 创建房间列表项
+        function createRoomItem(room) {
+            const isCurrentRoom = room.id === currentRoomId;
+            const canJoin = !isCurrentRoom;
+
+            return `
+                <div class="available-room-item ${isCurrentRoom ? 'active' : ''}"
+                     data-room-id="${room.id}"
+                     onclick="${canJoin ? `quickJoinRoom('${room.id}')` : ''}">
+                    <div class="room-item-header">
+                        <div class="room-item-id">${room.id}</div>
+                        ${isCurrentRoom ? '<span style="font-size: 12px; color: rgba(255,255,255,0.8);">当前房间</span>' : ''}
+                    </div>
+                    <div class="room-item-stats">
+                        <div class="room-stat">
+                            <span class="room-stat-icon">👥</span>
+                            <span>${room.memberCount}/${room.maxMembers}</span>
+                        </div>
+                        <div class="room-stat">
+                            <span class="room-stat-icon">🕐</span>
+                            <span>${formatTimeAgo(room.lastActivity)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 快速加入房间
+        function quickJoinRoom(roomId) {
+            document.getElementById('roomIdInput').value = roomId;
+            joinRoom();
+        }
+
+        // 显示无房间提示
+        function showNoRooms(message) {
+            const container = document.getElementById('availableRooms');
+            container.innerHTML = `
+                <div class="no-rooms">
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+
+        // 格式化时间
+        function formatTimeAgo(timestamp) {
+            const now = Date.now();
+            const diff = now - timestamp;
+
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (days > 0) return `${days}天前`;
+            if (hours > 0) return `${hours}小时前`;
+            if (minutes > 0) return `${minutes}分钟前`;
+            return '刚刚';
+        }
+
+        // 显示房间列表区域
+        function showRoomListSection() {
+            const section = document.getElementById('roomsSection');
+            section.style.display = 'block';
+        }
+
+        // 隐藏房间列表区域
+        function hideRoomListSection() {
+            const section = document.getElementById('roomsSection');
+            section.style.display = 'none';
+        }
+
         // 处理消息
         function handleMessage(message) {
             console.log('Received:', message);
@@ -831,6 +1121,8 @@
                         updateRoomInfo(message.data.memberCount);
                         addSystemMessage(`已加入房间: ${currentRoomId}`);
                         document.getElementById('sendButton').disabled = false;
+                        // 刷新房间列表以更新当前房间状态
+                        setTimeout(() => refreshRoomList(), 500);
                     }
                     break;
 
@@ -842,6 +1134,8 @@
                         isAdmin = false;
                         updateRoomInfo(0);
                         document.getElementById('sendButton').disabled = true;
+                        // 刷新房间列表以更新状态
+                        setTimeout(() => refreshRoomList(), 500);
                     }
                     break;
 
@@ -883,11 +1177,15 @@
                 case 'member_joined':
                     addSystemMessage(`新成员加入，当前人数: ${data.memberCount}`);
                     updateMemberCount(data.memberCount);
+                    // 延迟刷新房间列表以反映最新状态
+                    setTimeout(() => refreshRoomList(), 1000);
                     break;
 
                 case 'member_left':
                     addSystemMessage(`成员离开，当前人数: ${data.memberCount}`);
                     updateMemberCount(data.memberCount);
+                    // 延迟刷新房间列表以反映最新状态
+                    setTimeout(() => refreshRoomList(), 1000);
                     break;
 
                 case 'member_kicked':
