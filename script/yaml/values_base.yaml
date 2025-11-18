@@ -1,0 +1,67 @@
+server:
+  replicaCount: 1
+
+  image:
+    repository: registry.nb-sandbox.com/e2e-socket
+    tag: ${commit:0:7}
+    pullPolicy: Always
+
+  podSecurityContext: {}
+
+  deploymentStrategy:
+    type: RollingUpdate
+
+  # args:
+  #   - sh
+  #   - run.sh
+  # 注释掉自定义args，使用Dockerfile中的默认CMD
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+
+  ports:
+    - name: http
+      containerPort: 3000
+      protocol: TCP
+
+  # 存活探针 - 检测容器是否需要重启
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  # 就绪探针 - 检测容器是否准备好接收流量
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  lifecycle:
+    preStop:
+      exec:
+        command: ['/bin/sh', '-c', '/bin/sleep 45']
+
+service:
+  type: ClusterIP
+  port: 80

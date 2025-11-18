@@ -1,0 +1,71 @@
+nameOverride: 'e2e-socket-prod'
+fullnameOverride: 'e2e-socket-prod'
+
+server:
+  replicaCount: 4
+
+  env:
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+
+  # 存活探针 - 检测容器是否需要重启
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  # 就绪探针 - 检测容器是否准备好接收流量
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx-external
+    cert-manager.io/cluster-issuer: letsencrypt
+    cert-manager.io/common-name: biblevod.com
+    external-dns.alpha.kubernetes.io/hostname: biblevod.com,www.biblevod.com,biblevod-prod.nb-sandbox.com
+    kubernetes.io/tls-acme: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: '50m'
+    nginx.ingress.kubernetes.io/proxy-buffer-size: '16k'
+    # nginx.ingress.kubernetes.io/limit-rps: '5'
+    # nginx.ingress.kubernetes.io/limit-burst-multiplier: '2'
+
+  hosts:
+    - host: biblevod.com
+      paths:
+        - /
+    - host: www.biblevod.com
+      paths:
+        - /
+    - host: biblevod-prod.nb-sandbox.com
+      paths:
+        - /
+  tls:
+    - hosts:
+        - biblevod.com
+        - www.biblevod.com
+        - biblevod-prod.nb-sandbox.com
+      secretName: e2e-socket-tls

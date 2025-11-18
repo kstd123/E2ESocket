@@ -1,0 +1,5 @@
+# bible-website 项目的构建配置
+e2e-socket-server:
+  build:
+    # 执行构建脚本
+    command: /bin/bash ./build.sh

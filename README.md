@@ -50,6 +50,36 @@ npm start
 npm run dev
 ```
 
+### Kubernetes 部署
+
+#### 快速部署
+
+```bash
+# 生产环境一键部署
+npm run quick-deploy
+
+# 预发布环境
+npm run quick-deploy:stag
+
+# 开发环境
+npm run quick-deploy:dev
+```
+
+#### 手动部署
+
+```bash
+# 1. 构建 Docker 镜像
+npm run build
+
+# 2. 部署到 Kubernetes
+npm run deploy
+
+# 3. 查看状态
+kubectl get pods -n e2e-socket-production
+```
+
+详细部署文档：[Kubernetes 部署指南](KUBERNETES_DEPLOYMENT.md)
+
 ### 服务器地址
 
 - **WebSocket**: `ws://localhost:8080`

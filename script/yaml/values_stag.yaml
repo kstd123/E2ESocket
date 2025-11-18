@@ -1,0 +1,67 @@
+nameOverride: 'e2e-socket-stag'
+fullnameOverride: 'e2e-socket-stag'
+
+server:
+  replicaCount: 2
+
+  env:
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+
+  # 存活探针 - 检测容器是否需要重启
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  # 就绪探针 - 检测容器是否准备好接收流量
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx-internal
+    cert-manager.io/cluster-issuer: letsencrypt
+    cert-manager.io/common-name: &HOSTNAME e2e-socket-stag.nb-sandbox.com
+    external-dns.alpha.kubernetes.io/hostname: *HOSTNAME
+    kubernetes.io/tls-acme: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m'
+    nginx.ingress.kubernetes.io/proxy-buffer-size: '16k'
+    # nginx.ingress.kubernetes.io/limit-rps: '5'
+    # nginx.ingress.kubernetes.io/limit-burst-multiplier: '2'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($host = "e2e-socket-stag.nb-sandbox.com") {
+          set $test P;
+      }
+
+  hosts:
+    - host: e2e-socket-stag.nb-sandbox.com
+      paths:
+        - /
+  tls:
+    - hosts:
+        - *HOSTNAME
+      secretName: e2e-socket-stag-tls
